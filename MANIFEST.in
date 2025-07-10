@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include requirements.txt
+include CLAUDE.md
+include REFERENCE.md
+recursive-include tests *.py
+exclude tests/__pycache__
+global-exclude *.pyc
+global-exclude __pycache__
