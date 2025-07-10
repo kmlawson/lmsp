@@ -13,9 +13,18 @@ A simple command-line interface for sending prompts to LM Studio loaded models.
 
 ## Installation
 
-### Option 1: Install as a package (Recommended)
+### Option 1: Install as a global tool (Recommended)
 ```bash
-# Using uv (recommended)
+# Using uv tool (recommended - installs globally)
+uv tool install .
+
+# Or install from git repository
+uv tool install git+https://github.com/yourusername/lmsg.git
+```
+
+### Option 2: Install as a package in virtual environment
+```bash
+# Using uv
 uv venv
 source .venv/bin/activate
 uv pip install -e .
@@ -24,7 +33,7 @@ uv pip install -e .
 pip install -e .
 ```
 
-### Option 2: Direct usage
+### Option 3: Direct usage
 1. Make sure LM Studio is installed and running
 2. Install dependencies:
    ```bash
