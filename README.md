@@ -13,59 +13,74 @@ A simple command-line interface for sending prompts to LM Studio loaded models.
 
 ## Installation
 
+### Option 1: Install as a package (Recommended)
+```bash
+# Using uv (recommended)
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+
+# Or using pip
+pip install -e .
+```
+
+### Option 2: Direct usage
 1. Make sure LM Studio is installed and running
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Make the script executable:
+3. Use directly:
    ```bash
-   chmod +x lmsg.py
-   ```
-
-4. Optionally, create a symlink to use from anywhere:
-   ```bash
-   ln -s $(pwd)/lmsg.py /usr/local/bin/lmsg
+   python -m lmsg.cli "Your prompt here"
    ```
 
 ## Usage
 
 ### Basic usage
 ```bash
-./lmsg.py "What is the capital of France?"
+lmsg "What is the capital of France?"
 ```
 
 ### Specify a model
 ```bash
 # Use a specific model (loads it automatically if not already loaded)
-./lmsg.py -m llama-3.2-1b-instruct "Explain quantum computing"
+lmsg -m llama-3.2-1b-instruct "Explain quantum computing"
 
 # Enable verbose logging for debugging
-./lmsg.py -v -m llama-3.2-1b-instruct "What is AI?"
+lmsg -v -m llama-3.2-1b-instruct "What is AI?"
 ```
 
 ### Pipe input
 ```bash
 # Simple piping - replaces the prompt
-cat document.txt | ./lmsg.py
+cat document.txt | lmsg
 
 # Combine prompt with piped content (default appends)
-cat document.txt | ./lmsg.py "Summarize this document:"
+cat document.txt | lmsg "Summarize this document:"
 
 # Control how piped input is combined
-cat context.txt | ./lmsg.py "Answer based on context:" --pipe-mode prepend
-cat document.txt | ./lmsg.py "Summarize:" --pipe-mode append
+cat context.txt | lmsg "Answer based on context:" --pipe-mode prepend
+cat document.txt | lmsg "Summarize:" --pipe-mode append
+
+# Real example: Translate Norwegian text to English
+cat tests/testdata/test-text.md | lmsg "Please translate the following Norwegian text to English:"
 ```
 
 ### Check loaded models
 ```bash
-./lmsg.py --list-models
+lmsg --list-models
 ```
 
 ### Check server status
 ```bash
-./lmsg.py --check-server
+lmsg --check-server
+```
+
+### Get help
+```bash
+lmsg --help
 ```
 
 ## Prerequisites

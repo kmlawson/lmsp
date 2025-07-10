@@ -237,6 +237,33 @@ class TestLmsg(unittest.TestCase):
         
         mock_debug.assert_called_with("Debug message")
         mock_info.assert_called_with("Info message")
+    
+    def test_piping_real_file_content_for_translation(self):
+        """Test piping actual file content from testdata and processing it"""
+        import os
+        test_file = os.path.join(os.path.dirname(__file__), 'testdata', 'test-text.md')
+        
+        # Read the test file content
+        with open(test_file, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+        
+        # Mock all the components
+        with patch('lmsg.cli.get_server_status', return_value={"running": True}), \
+             patch('lmsg.cli.send_prompt') as mock_send, \
+             patch('sys.stdin.isatty', return_value=False), \
+             patch('sys.stdin.read', return_value=content), \
+             patch('sys.argv', ['lmsg', 'Please translate the following Norwegian text to English:']), \
+             patch('builtins.print') as mock_print:
+            
+            mock_send.return_value = "Translation successful"
+            lmsg.main()
+            
+            # Verify the Norwegian content was properly combined with the prompt
+            call_args = mock_send.call_args[0][0]
+            self.assertIn("Please translate the following Norwegian text to English:", call_args)
+            self.assertIn("FORORD TIL ELEVEN", call_args)
+            self.assertIn("Denne boka er skrevet", call_args)
+            mock_print.assert_called_once_with("Translation successful")
 
 if __name__ == '__main__':
     unittest.main()
