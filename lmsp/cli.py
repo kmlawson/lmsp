@@ -647,7 +647,8 @@ def main():
     
     parser = argparse.ArgumentParser(
         description='Send prompts to LM Studio loaded models. Models must be pre-loaded using "lms load <model>" or LM Studio desktop app.',
-        prog='lmsp'
+        prog='lmsp',
+        epilog=f'Configuration file: {CONFIG_FILE} (auto-created with defaults)'
     )
     
     parser.add_argument('prompt', 
