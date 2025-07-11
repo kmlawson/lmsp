@@ -1,4 +1,4 @@
-"""lmsg - LM Studio Message CLI
+"""lmsp - LM Studio Prompt CLI
 
 A command-line interface for sending prompts to LM Studio loaded models.
 """
@@ -14,7 +14,14 @@ from .cli import (
     ensure_model_loaded,
     get_server_status,
     list_available_models,
-    setup_logging
+    setup_logging,
+    LMSPSecurityError,
+    LMSPValidationError,
+    validate_model_name,
+    validate_port,
+    validate_prompt,
+    sanitize_terminal_output,
+    safe_json_loads
 )
 
 __all__ = [
@@ -24,5 +31,12 @@ __all__ = [
     "ensure_model_loaded",
     "get_server_status",
     "list_available_models",
-    "setup_logging"
+    "setup_logging",
+    "LMSPSecurityError",
+    "LMSPValidationError",
+    "validate_model_name",
+    "validate_port", 
+    "validate_prompt",
+    "sanitize_terminal_output",
+    "safe_json_loads"
 ]

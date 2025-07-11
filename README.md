@@ -1,4 +1,4 @@
-# lmsg - LM Studio Message CLI
+# lmsp - LM Studio Prompt CLI
 
 A simple command-line interface for sending prompts to LM Studio loaded models.
 
@@ -6,7 +6,7 @@ A simple command-line interface for sending prompts to LM Studio loaded models.
 
 - Send prompts to locally loaded LM Studio models
 - Automatically uses the first loaded model (or specify with `-m`)
-- **Automatic model loading**: If a model isn't loaded, lmsg will load it for you
+- **Automatic model loading**: If a model isn't loaded, lmsp will load it for you
 - Support for piping input from other commands
 - Verbose logging with `-v` flag for debugging
 - Simple and fast command-line interface
@@ -19,7 +19,7 @@ A simple command-line interface for sending prompts to LM Studio loaded models.
 uv tool install .
 
 # Or install from git repository
-uv tool install git+https://github.com/yourusername/lmsg.git
+uv tool install git+https://github.com/yourusername/lmsp.git
 ```
 
 ### Option 2: Install as a package in virtual environment
@@ -42,55 +42,77 @@ pip install -e .
 
 3. Use directly:
    ```bash
-   python -m lmsg.cli "Your prompt here"
+   python -m lmsp.cli "Your prompt here"
    ```
 
 ## Usage
 
 ### Basic usage
 ```bash
-lmsg "What is the capital of France?"
+lmsp "What is the capital of France?"
 ```
 
 ### Specify a model
 ```bash
 # Use a specific model (loads it automatically if not already loaded)
-lmsg -m llama-3.2-1b-instruct "Explain quantum computing"
+lmsp -m llama-3.2-1b-instruct "Explain quantum computing"
 
 # Enable verbose logging for debugging
-lmsg -v -m llama-3.2-1b-instruct "What is AI?"
+lmsp -v -m llama-3.2-1b-instruct "What is AI?"
 ```
 
 ### Pipe input
 ```bash
 # Simple piping - replaces the prompt
-cat document.txt | lmsg
+cat document.txt | lmsp
 
 # Combine prompt with piped content (default appends)
-cat document.txt | lmsg "Summarize this document:"
+cat document.txt | lmsp "Summarize this document:"
 
 # Control how piped input is combined
-cat context.txt | lmsg "Answer based on context:" --pipe-mode prepend
-cat document.txt | lmsg "Summarize:" --pipe-mode append
+cat context.txt | lmsp "Answer based on context:" --pipe-mode prepend
+cat document.txt | lmsp "Summarize:" --pipe-mode append
 
 # Real example: Translate Norwegian text to English
-cat tests/testdata/test-text.md | lmsg "Please translate the following Norwegian text to English:"
+cat tests/testdata/test-text.md | lmsp "Please translate the following Norwegian text to English:"
 ```
 
 ### Check loaded models
 ```bash
-lmsg --list-models
+lmsp --list-models
 ```
 
 ### Check server status
 ```bash
-lmsg --check-server
+lmsp --check-server
 ```
 
 ### Get help
 ```bash
-lmsg --help
+lmsp --help
 ```
+
+## Security Considerations
+
+When using `lmsp`, please be aware of the following security considerations:
+
+### Piped Content
+- **Be cautious about what content you pipe to `lmsp`**. The piped content is directly appended or prepended to your prompt without sanitization.
+- Avoid piping untrusted content or files from unknown sources
+- Be especially careful when piping content that might contain prompt injection attempts or malicious instructions
+- Example of what to avoid:
+  ```bash
+  # Don't pipe untrusted user input or files
+  cat untrusted_user_file.txt | lmsp "Summarize this:"
+  ```
+
+### Model Selection
+- Only use trusted models that you have intentionally loaded into LM Studio
+- Be aware that models will execute the prompts you send, including any piped content
+
+### Local Usage
+- `lmsp` is designed for local use with your own LM Studio instance
+- It connects to `localhost` only and does not expose any network services
 
 ## Prerequisites
 
@@ -101,7 +123,7 @@ lmsg --help
 ## Running Tests
 
 ```bash
-python -m unittest tests.test_lmsg -v
+python -m unittest tests.test_lmsp -v
 ```
 
 ## Planned Features

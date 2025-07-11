@@ -1,7 +1,7 @@
-# Project: lmsg CLI
+# Project: lmsp CLI
 
 ## Project Overview
-- Goal of this app is to build a simple CLI called lmsg which, when run, will send a prompt to a local lm-studio loaded model (default the first loaded model returned by "lms ps") and return to the shell the response of the model. 
+- Goal of this app is to build a simple CLI called lmsp which, when run, will send a prompt to a local lm-studio loaded model (default the first loaded model returned by "lms ps") and return to the shell the response of the model. 
 
 ## Planned Features
 - Eventually we would like to add these features:

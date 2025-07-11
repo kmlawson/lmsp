@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(uv cache clean:*)",
+      "Bash(uv tool uninstall:*)",
+      "Bash(uv tool install:*)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python:*)",
+      "Bash(lmsg:*)",
+      "Bash(mv:*)"
+    ],
+    "deny": []
+  }
+}
