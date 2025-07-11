@@ -90,7 +90,7 @@ The configuration file uses JSON format:
 
 ```json
 {
-  "model": "llama-3.2-1b-instruct",
+  "model": "google/gemma-3n-e4b",
   "port": 1234,
   "pipe_mode": "append",
   "wait": true,
@@ -101,8 +101,8 @@ The configuration file uses JSON format:
 ```
 
 This configuration would:
-- Use "llama-3.2-1b-instruct" as the default model
-- Wait for complete responses (no streaming)
+- Use "google/gemma-3n-e4b" as the default model
+- Wait for complete responses (no streaming) and beautify markdown output
 - Show response statistics by default
 - Append piped content to prompts
 
@@ -114,7 +114,7 @@ Command-line arguments always override configuration file settings.
 Before using lmsp, you need to load a model:
 ```bash
 # Load a model using lms command
-lms load llama-3.2-1b-instruct
+lms load google/gemma-3n-e4b
 
 # Or use LM Studio desktop app to load a model
 ```
@@ -130,7 +130,7 @@ lmsp "What is the capital of France?"
 lmsp -m llama-3.2-1b-instruct "Explain quantum computing"
 
 # Enable verbose logging for debugging
-lmsp -v -m llama-3.2-1b-instruct "What is AI?"
+lmsp -v -m google/gemma-3n-e4b "What is AI?"
 ```
 
 ### Pipe input
@@ -145,8 +145,8 @@ cat document.txt | lmsp "Summarize this document:"
 cat context.txt | lmsp "Answer based on context:" --pipe-mode prepend
 cat document.txt | lmsp "Summarize:" --pipe-mode append
 
-# Real example: Translate Norwegian text to English
-cat tests/testdata/test-text.md | lmsp "Please translate the following Norwegian text to English:"
+# Real example: Translate a text to English
+cat tests/testdata/test-text.md | lmsp "Please translate the following text to English:"
 ```
 
 ### Check loaded models
@@ -166,6 +166,7 @@ lmsp --check-server
 ### Get help
 ```bash
 lmsp --help
+# or lmsp -h
 ```
 
 ## Security Considerations
@@ -204,6 +205,6 @@ python -m unittest tests.test_lmsp -v
 
 ## Planned Features
 
-- Ability to attach images with `-a` flag
+- Ability to attach images with `-a` flag for multi-modal models
 - Ability to continue from last prompt
 - Enhanced piping support for documents
