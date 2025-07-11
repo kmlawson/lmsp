@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lmsp"
-version = "0.5.0"
+version = "0.5.5"
 description = "A command-line interface for sending prompts to LM Studio loaded models"
 readme = "README.md"
 requires-python = ">=3.8"

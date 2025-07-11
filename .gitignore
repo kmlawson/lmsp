@@ -157,6 +157,8 @@ tmp/
 *.claude
 claude.config
 claude.settings
+claude.md
+CLAUDE.md
 
 # API keys and secrets
 *.key

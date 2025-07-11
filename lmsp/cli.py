@@ -180,7 +180,7 @@ def get_default_config() -> Dict[str, Any]:
     return {
         "model": None,
         "port": 1234,
-        "pipe_mode": "replace",
+        "pipe_mode": "append",
         "wait": False,
         "stats": False,
         "plain": False,
@@ -673,8 +673,8 @@ def main():
     
     parser.add_argument('--pipe-mode',
                        choices=['replace', 'append', 'prepend'],
-                       default=config.get('pipe_mode', 'replace'),
-                       help=f'How to handle piped input: replace, append, or prepend to prompt (default: {config.get("pipe_mode", "replace")})')
+                       default=config.get('pipe_mode', 'append'),
+                       help=f'How to handle piped input: replace, append, or prepend to prompt (default: {config.get("pipe_mode", "append")})')
     
     parser.add_argument('--list-models',
                        action='store_true',
