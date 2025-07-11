@@ -3,7 +3,7 @@
 A command-line interface for sending prompts to LM Studio loaded models.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.5"
 __author__ = "Your Name"
 __email__ = "your.email@example.com"
 
