@@ -25,6 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+lmsp.egg-info/
 
 # PyInstaller
 *.manifest
@@ -149,3 +150,30 @@ cython_debug/
 # Local development
 .local/
 tmp/
+
+# Claude-related files
+.claude
+.claude/
+*.claude
+claude.config
+claude.settings
+
+# API keys and secrets
+*.key
+*.secret
+*.token
+.env.local
+.env.*.local
+secrets/
+credentials/
+
+# Editor and IDE specific
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Personal configuration
+personal.config
+user.settings

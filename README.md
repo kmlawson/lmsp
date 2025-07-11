@@ -5,47 +5,119 @@ A simple command-line interface for sending prompts to LM Studio loaded models.
 ## Features
 
 - Send prompts to locally loaded LM Studio models
-- Automatically uses the first loaded model (or specify with `-m`)
-- **Automatic model loading**: If a model isn't loaded, lmsp will load it for you
+- Uses the first loaded model by default (or specify with `-m`)
+- **Requires pre-loaded models**: Models must be loaded using `lms load <model>` or LM Studio desktop app
 - Support for piping input from other commands
 - Verbose logging with `-v` flag for debugging
 - Simple and fast command-line interface
 
 ## Installation
 
-### Option 1: Install as a global tool (Recommended)
+### Quick Install from PyPI (Recommended)
 ```bash
-# Using uv tool (recommended - installs globally)
-uv tool install .
+# Install globally with pip
+pip install lmsp
 
-# Or install from git repository
-uv tool install git+https://github.com/yourusername/lmsp.git
+# Or install globally with uv (recommended)
+uv tool install lmsp
 ```
 
-### Option 2: Install as a package in virtual environment
+### Alternative Installation Methods
+
+#### Install from source
+```bash
+# Using uv tool (recommended - installs globally)
+uv tool install git+https://github.com/kmlawson/lmsp.git
+
+# Or clone and install locally
+git clone https://github.com/kmlawson/lmsp.git
+cd lmsp
+uv tool install .
+```
+
+#### Install in virtual environment
 ```bash
 # Using uv
 uv venv
 source .venv/bin/activate
-uv pip install -e .
+uv pip install lmsp
 
 # Or using pip
-pip install -e .
+python -m venv venv
+source venv/bin/activate
+pip install lmsp
 ```
 
-### Option 3: Direct usage
-1. Make sure LM Studio is installed and running
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+#### Development installation
+```bash
+# Clone and install in development mode
+git clone https://github.com/kmlawson/lmsp.git
+cd lmsp
+uv pip install -e .  # or pip install -e .
+```
 
-3. Use directly:
-   ```bash
-   python -m lmsp.cli "Your prompt here"
-   ```
+## Configuration
+
+lmsp supports a configuration file to set default values for command-line options. The configuration file is located at `~/.lmsp-config` and is automatically created with default values when you first run lmsp.
+
+### Configuration File Format
+
+The configuration file uses JSON format:
+
+```json
+{
+  "model": null,
+  "port": 1234,
+  "pipe_mode": "replace",
+  "wait": false,
+  "stats": false,
+  "plain": false,
+  "verbose": false
+}
+```
+
+### Configuration Options
+
+- **model**: Default model to use (null means use first loaded model)
+- **port**: Default LM Studio server port (1234)
+- **pipe_mode**: How to handle piped input ("replace", "append", or "prepend")
+- **wait**: Disable streaming by default (false)
+- **stats**: Show response statistics by default (false)
+- **plain**: Disable markdown formatting by default (false)
+- **verbose**: Enable verbose logging by default (false)
+
+### Example Custom Configuration
+
+```json
+{
+  "model": "llama-3.2-1b-instruct",
+  "port": 1234,
+  "pipe_mode": "append",
+  "wait": true,
+  "stats": true,
+  "plain": false,
+  "verbose": false
+}
+```
+
+This configuration would:
+- Use "llama-3.2-1b-instruct" as the default model
+- Wait for complete responses (no streaming)
+- Show response statistics by default
+- Append piped content to prompts
+
+Command-line arguments always override configuration file settings.
 
 ## Usage
+
+### Prerequisites
+Before using lmsp, you need to load a model:
+```bash
+# Load a model using lms command
+lms load llama-3.2-1b-instruct
+
+# Or use LM Studio desktop app to load a model
+```
 
 ### Basic usage
 ```bash
@@ -54,7 +126,7 @@ lmsp "What is the capital of France?"
 
 ### Specify a model
 ```bash
-# Use a specific model (loads it automatically if not already loaded)
+# Use a specific model (must be already loaded)
 lmsp -m llama-3.2-1b-instruct "Explain quantum computing"
 
 # Enable verbose logging for debugging
@@ -79,7 +151,11 @@ cat tests/testdata/test-text.md | lmsp "Please translate the following Norwegian
 
 ### Check loaded models
 ```bash
+# List currently loaded models
 lmsp --list-models
+
+# List all available models (not loaded)
+lms ls
 ```
 
 ### Check server status

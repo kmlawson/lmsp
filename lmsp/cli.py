@@ -8,6 +8,8 @@ import logging
 import time
 import re
 import shlex
+import os
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,9 @@ MAX_TOKEN_BYTES = 1024 * 1024  # 1MB max per individual token to prevent memory 
 MIN_PORT = 1024
 MAX_PORT = 65535
 REQUEST_TIMEOUT = 60
+
+# Configuration file
+CONFIG_FILE = Path.home() / ".lmsp-config"
 
 # Security: Whitelist pattern for model names (allow slashes for namespaced models)
 MODEL_NAME_PATTERN = re.compile(r'^[A-Za-z0-9._\-/]+$')
@@ -170,6 +175,81 @@ def setup_logging(verbose: bool = False):
     )
     logger.setLevel(level)
 
+def get_default_config() -> Dict[str, Any]:
+    """Get default configuration values"""
+    return {
+        "model": None,
+        "port": 1234,
+        "pipe_mode": "replace",
+        "wait": False,
+        "stats": False,
+        "plain": False,
+        "verbose": False
+    }
+
+def load_config() -> Dict[str, Any]:
+    """Load configuration from file, creating it if it doesn't exist"""
+    config = get_default_config()
+    
+    try:
+        if CONFIG_FILE.exists():
+            logger.debug(f"Loading config from {CONFIG_FILE}")
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                file_config = safe_json_loads(f.read())
+                
+                # Validate and merge config values
+                if isinstance(file_config, dict):
+                    for key, value in file_config.items():
+                        if key in config:
+                            # Validate specific config values
+                            if key == "port" and isinstance(value, int):
+                                try:
+                                    config[key] = validate_port(value)
+                                except LMSPValidationError:
+                                    logger.warning(f"Invalid port in config: {value}, using default")
+                            elif key == "model":
+                                if value is not None:
+                                    try:
+                                        config[key] = validate_model_name(str(value))
+                                    except LMSPValidationError:
+                                        logger.warning(f"Invalid model name in config: {value}, using default")
+                                else:
+                                    config[key] = None
+                            elif key == "pipe_mode" and value in ["replace", "append", "prepend"]:
+                                config[key] = value
+                            elif key in ["wait", "stats", "plain", "verbose"] and isinstance(value, bool):
+                                config[key] = value
+                            else:
+                                logger.warning(f"Invalid config value for {key}: {value}, using default")
+                        else:
+                            logger.warning(f"Unknown config key: {key}")
+                else:
+                    logger.warning("Config file is not a valid JSON object, using defaults")
+        else:
+            logger.debug(f"Config file {CONFIG_FILE} does not exist, creating with defaults")
+            save_config(config)
+            
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in config file: {e}, using defaults")
+    except LMSPSecurityError as e:
+        logger.error(f"Security error in config file: {e}, using defaults")
+    except Exception as e:
+        logger.error(f"Error loading config: {e}, using defaults")
+    
+    return config
+
+def save_config(config: Dict[str, Any]) -> bool:
+    """Save configuration to file"""
+    try:
+        logger.debug(f"Saving config to {CONFIG_FILE}")
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        logger.info(f"Configuration saved to {CONFIG_FILE}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving config: {e}")
+        return False
+
 def get_loaded_models() -> List[dict]:
     """Get list of loaded models using lms ps command"""
     try:
@@ -286,48 +366,27 @@ def list_available_models() -> List[str]:
         logger.error(f"Error listing available models: {e}")
         return []
 
-def ensure_model_loaded(model_name: str) -> bool:
-    """Ensure a model is loaded, loading it if necessary"""
+def check_model_loaded(model_name: str) -> bool:
+    """Check if a specific model is loaded"""
     try:
         # Security: Validate model name to prevent command injection
         validated_model_name = validate_model_name(model_name)
-        logger.debug(f"Ensuring model '{validated_model_name}' is loaded")
+        logger.debug(f"Checking if model '{validated_model_name}' is loaded")
         
-        # Check if model is already loaded
+        # Check if model is loaded
         loaded_models = get_loaded_models()
         for loaded in loaded_models:
             if loaded.get("identifier") == validated_model_name or loaded.get("name") == validated_model_name:
-                logger.info(f"Model '{validated_model_name}' is already loaded")
+                logger.info(f"Model '{validated_model_name}' is loaded")
                 return True
         
-        # Try to load the model
-        logger.info(f"Model '{validated_model_name}' not loaded, attempting to load...")
-        # Security: Use list form to prevent command injection
-        result = subprocess.run(['lms', 'load', validated_model_name], capture_output=True, text=True, shell=False, timeout=120)
-        if result.returncode == 0:
-            logger.info(f"Successfully loaded model '{validated_model_name}'")
-            return True
-        else:
-            logger.error(f"Failed to load model: {result.stderr}")
-            
-            # If model doesn't exist, list available models
-            if "not found" in result.stderr.lower() or "does not exist" in result.stderr.lower():
-                logger.info("Listing available models...")
-                available = list_available_models()
-                if available:
-                    print("\nAvailable models:", file=sys.stderr)
-                    for model in available:
-                        print(f"  - {model}", file=sys.stderr)
-                    print(f"\nUse 'lms load <model>' to load one of these models", file=sys.stderr)
-            return False
-    except subprocess.TimeoutExpired:
-        logger.error(f"Timeout loading model '{model_name}'")
+        logger.info(f"Model '{validated_model_name}' is not loaded")
         return False
     except LMSPValidationError as e:
         logger.error(f"Invalid model name '{model_name}': {e}")
         return False
     except Exception as e:
-        logger.error(f"Error loading model: {e}")
+        logger.error(f"Error checking model: {e}")
         return False
 
 def send_prompt(prompt: str, model: Optional[str] = None, port: int = 1234, stream: bool = True, show_stats: bool = False, plain: bool = False) -> tuple[str, Optional[Dict[str, Any]]]:
@@ -349,7 +408,17 @@ def send_prompt(prompt: str, model: Optional[str] = None, port: int = 1234, stre
         if not validated_model:
             models = get_loaded_models()
             if not models:
-                return "Error: No models loaded. Use 'lms load <model>' to load a model.", None
+                available_models = list_available_models()
+                if available_models:
+                    error_msg = "Error: No models loaded. Load a model first using 'lms load <model>' or LM Studio desktop app.\n\nAvailable models:"
+                    for model in available_models[:5]:  # Show first 5 models
+                        error_msg += f"\n  - {model}"
+                    if len(available_models) > 5:
+                        error_msg += f"\n  ... and {len(available_models) - 5} more"
+                    error_msg += f"\n\nUse 'lms load <model>' to load a model."
+                else:
+                    error_msg = "Error: No models loaded and no available models found. Please install models in LM Studio first."
+                return error_msg, None
             
             # Security: Validate default model name from external source
             raw_model_name = models[0].get("identifier", models[0].get("name", ""))
@@ -573,8 +642,11 @@ def send_prompt(prompt: str, model: Optional[str] = None, port: int = 1234, stre
         return f"Error: {str(e)}", None
 
 def main():
+    # Load configuration first
+    config = load_config()
+    
     parser = argparse.ArgumentParser(
-        description='Send prompts to LM Studio loaded models',
+        description='Send prompts to LM Studio loaded models. Models must be pre-loaded using "lms load <model>" or LM Studio desktop app.',
         prog='lmsp'
     )
     
@@ -583,7 +655,8 @@ def main():
                        help='The prompt to send to the model')
     
     parser.add_argument('-m', '--model',
-                       help='Specify which model to use (default: first loaded model)')
+                       default=config.get('model'),
+                       help='Specify which model to use (must be already loaded - default: first loaded model)')
     
     def validate_port_arg(value):
         try:
@@ -594,37 +667,46 @@ def main():
     
     parser.add_argument('--port',
                        type=validate_port_arg,
-                       default=1234,
-                       help=f'LM Studio server port (default: 1234, range: {MIN_PORT}-{MAX_PORT})')
+                       default=config.get('port', 1234),
+                       help=f'LM Studio server port (default: {config.get("port", 1234)}, range: {MIN_PORT}-{MAX_PORT})')
     
     parser.add_argument('--pipe-mode',
                        choices=['replace', 'append', 'prepend'],
-                       default='replace',
-                       help='How to handle piped input: replace (default), append, or prepend to prompt')
+                       default=config.get('pipe_mode', 'replace'),
+                       help=f'How to handle piped input: replace, append, or prepend to prompt (default: {config.get("pipe_mode", "replace")})')
     
     parser.add_argument('--list-models',
                        action='store_true',
-                       help='List currently loaded models')
+                       help='List currently loaded models (use "lms ls" to see all available models)')
     
     parser.add_argument('--check-server',
                        action='store_true',
                        help='Check if LM Studio server is running')
     
+    # For boolean flags, we need to handle the config defaults differently
+    wait_default = config.get('wait', False)
     parser.add_argument('-w', '--wait',
                        action='store_true',
-                       help='Wait for complete response before returning (disable streaming)')
+                       default=wait_default,
+                       help=f'Wait for complete response before returning (disable streaming) (default: {wait_default})')
     
+    stats_default = config.get('stats', False)
     parser.add_argument('-s', '--stats',
                        action='store_true',
-                       help='Show response statistics (first token latency, tokens/sec, total time)')
+                       default=stats_default,
+                       help=f'Show response statistics (first token latency, tokens/sec, total time) (default: {stats_default})')
     
+    plain_default = config.get('plain', False)
     parser.add_argument('-p', '--plain',
                        action='store_true',
-                       help='Disable markdown formatting (useful for piping or saving to files)')
+                       default=plain_default,
+                       help=f'Disable markdown formatting (useful for piping or saving to files) (default: {plain_default})')
     
+    verbose_default = config.get('verbose', False)
     parser.add_argument('-v', '--verbose',
                        action='store_true',
-                       help='Enable verbose logging for debugging')
+                       default=verbose_default,
+                       help=f'Enable verbose logging for debugging (default: {verbose_default})')
     
     args = parser.parse_args()
     
@@ -633,13 +715,16 @@ def main():
     
     # Handle special commands
     if args.list_models:
-        models = get_loaded_models()
-        if models:
+        loaded_models = get_loaded_models()
+        if loaded_models:
             print("Loaded models:")
-            for model in models:
+            for model in loaded_models:
                 print(f"  - {model.get('identifier', model.get('name', 'Unknown'))}")
         else:
             print("No models currently loaded")
+        
+        print("\nTo see all available models, use: lms ls")
+        print("To load a model, use: lms load <model>")
         return
     
     if args.check_server:
@@ -682,12 +767,22 @@ def main():
         print("Error: LM Studio server is not running. Start it with 'lms server start'", file=sys.stderr)
         sys.exit(1)
     
-    # If model specified, ensure it's loaded
+    # If model specified, check if it's loaded
     if args.model:
         try:
-            logger.info(f"Ensuring model '{args.model}' is loaded...")
-            if not ensure_model_loaded(args.model):
-                print(f"Error: Failed to load model '{args.model}'", file=sys.stderr)
+            logger.info(f"Checking if model '{args.model}' is loaded...")
+            if not check_model_loaded(args.model):
+                available_models = list_available_models()
+                if available_models:
+                    print(f"Error: Model '{args.model}' is not loaded. Load it first using 'lms load {args.model}' or LM Studio desktop app.\n", file=sys.stderr)
+                    print("Available models:", file=sys.stderr)
+                    for model in available_models[:5]:  # Show first 5 models
+                        print(f"  - {model}", file=sys.stderr)
+                    if len(available_models) > 5:
+                        print(f"  ... and {len(available_models) - 5} more", file=sys.stderr)
+                    print(f"\nUse 'lms load <model>' to load a model.", file=sys.stderr)
+                else:
+                    print(f"Error: Model '{args.model}' is not loaded and no available models found. Please install models in LM Studio first.", file=sys.stderr)
                 sys.exit(1)
         except LMSPValidationError as e:
             print(f"Error: Invalid model name. Model names must contain only alphanumeric characters, dots, hyphens, underscores and slashes.", file=sys.stderr)

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lmsp"
-version = "0.1.0"
+version = "0.5.0"
 description = "A command-line interface for sending prompts to LM Studio loaded models"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Konrad M. Lawson", email = "kl@muninn.net"}
 ]
 keywords = ["lm-studio", "cli", "ai", "llm", "prompt"]
 classifiers = [
@@ -45,8 +45,8 @@ dev = [
 lmsp = "lmsp.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/lmsp"
-Issues = "https://github.com/yourusername/lmsp/issues"
+Homepage = "https://github.com/kmlawson/lmsp"
+Issues = "https://github.com/kmlawson/lmsp/issues"
 
 [tool.setuptools]
 packages = ["lmsp"]

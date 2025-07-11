@@ -3,6 +3,9 @@ import unittest
 from unittest.mock import patch, MagicMock
 import sys
 import os
+import json
+import tempfile
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lmsp import cli as lmsp
@@ -89,9 +92,12 @@ class TestLmsp(unittest.TestCase):
     
     def test_send_prompt_fails_when_no_models_loaded(self):
         """Test error message when attempting to send prompt with no loaded models"""
-        with patch('lmsp.cli.get_loaded_models', return_value=[]):
+        with patch('lmsp.cli.get_loaded_models', return_value=[]), \
+             patch('lmsp.cli.list_available_models', return_value=['model1', 'model2']):
             response, _ = lmsp.send_prompt("Hello")
             self.assertIn("No models loaded", response)
+            self.assertIn("Load a model first", response)
+            self.assertIn("lms load", response)
     
     @patch('lmsp.get_loaded_models')
     @patch('requests.post')
@@ -265,8 +271,10 @@ class TestLmsp(unittest.TestCase):
     @patch('sys.stdin.read')
     @patch('lmsp.cli.get_server_status')
     @patch('lmsp.cli.send_prompt')
-    def test_piped_input_replaces_prompt_by_default(self, mock_send, mock_status, mock_read, mock_isatty, mock_print, mock_stderr):
+    @patch('lmsp.cli.load_config')
+    def test_piped_input_replaces_prompt_by_default(self, mock_load_config, mock_send, mock_status, mock_read, mock_isatty, mock_print, mock_stderr):
         """Test piped content becomes the prompt when no arguments given"""
+        mock_load_config.return_value = lmsp.get_default_config()
         mock_isatty.return_value = False
         mock_read.return_value = "This is piped content"
         mock_status.return_value = {"running": True}
@@ -285,8 +293,10 @@ class TestLmsp(unittest.TestCase):
     @patch('sys.stdin.read')
     @patch('lmsp.cli.get_server_status')
     @patch('lmsp.cli.send_prompt')
-    def test_pipe_mode_append_adds_piped_content_after_prompt(self, mock_send, mock_status, mock_read, mock_isatty, mock_print, mock_stderr):
+    @patch('lmsp.cli.load_config')
+    def test_pipe_mode_append_adds_piped_content_after_prompt(self, mock_load_config, mock_send, mock_status, mock_read, mock_isatty, mock_print, mock_stderr):
         """Test --pipe-mode append adds piped content after the main prompt"""
+        mock_load_config.return_value = lmsp.get_default_config()
         mock_isatty.return_value = False
         mock_read.return_value = "Document content here"
         mock_status.return_value = {"running": True}
@@ -305,8 +315,10 @@ class TestLmsp(unittest.TestCase):
     @patch('sys.stdin.read')
     @patch('lmsp.cli.get_server_status')
     @patch('lmsp.cli.send_prompt')
-    def test_pipe_mode_prepend_adds_piped_content_before_prompt(self, mock_send, mock_status, mock_read, mock_isatty, mock_print, mock_stderr):
+    @patch('lmsp.cli.load_config')
+    def test_pipe_mode_prepend_adds_piped_content_before_prompt(self, mock_load_config, mock_send, mock_status, mock_read, mock_isatty, mock_print, mock_stderr):
         """Test --pipe-mode prepend adds piped content before the main prompt"""
+        mock_load_config.return_value = lmsp.get_default_config()
         mock_isatty.return_value = False
         mock_read.return_value = "Context document"
         mock_status.return_value = {"running": True}
@@ -319,30 +331,25 @@ class TestLmsp(unittest.TestCase):
         mock_print.assert_called_once_with("Response")
     
     @patch('subprocess.run')
-    def test_model_auto_loading_when_not_loaded(self, mock_run):
-        """Test automatic model loading when specified model isn't loaded"""
-        # First call returns empty list (no models loaded)
-        # Second call loads the model successfully
-        mock_run.side_effect = [
-            MagicMock(returncode=0, stdout='[]'),  # No models loaded
-            MagicMock(returncode=0, stdout='', stderr='')  # Load successful
-        ]
+    def test_check_model_loaded_when_not_loaded(self, mock_run):
+        """Test checking if a model is loaded when it's not"""
+        mock_run.return_value = MagicMock(returncode=0, stdout='[]')  # No models loaded
         
-        result = lmsp.ensure_model_loaded("llama-3.2-1b-instruct")
-        self.assertTrue(result)
+        result = lmsp.check_model_loaded("llama-3.2-1b-instruct")
+        self.assertFalse(result)
         
-        # Verify load command was called
-        mock_run.assert_any_call(['lms', 'load', 'llama-3.2-1b-instruct'], capture_output=True, text=True, shell=False, timeout=120)
+        # Should only call ps, not load
+        mock_run.assert_called_once_with(['lms', 'ps', '--json'], capture_output=True, text=True, shell=False, timeout=30)
     
     @patch('subprocess.run')
-    def test_model_auto_loading_skipped_when_already_loaded(self, mock_run):
-        """Test no loading attempt when specified model is already loaded"""
+    def test_check_model_loaded_when_already_loaded(self, mock_run):
+        """Test checking if a model is loaded when it is"""
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout='[{"identifier": "llama-3.2-1b-instruct"}]'
         )
         
-        result = lmsp.ensure_model_loaded("llama-3.2-1b-instruct")
+        result = lmsp.check_model_loaded("llama-3.2-1b-instruct")
         self.assertTrue(result)
         
         # Should only call ps, not load
@@ -407,6 +414,128 @@ class TestLmsp(unittest.TestCase):
             # Verify non-streaming mode was used
             self.assertEqual(mock_send.call_args[1]['stream'], False)
             mock_print.assert_called_once_with("Translation successful")
+
+    def test_get_default_config(self):
+        """Test default configuration values"""
+        config = lmsp.get_default_config()
+        
+        expected_config = {
+            "model": None,
+            "port": 1234,
+            "pipe_mode": "replace",
+            "wait": False,
+            "stats": False,
+            "plain": False,
+            "verbose": False
+        }
+        
+        self.assertEqual(config, expected_config)
+
+    def test_load_config_creates_file_if_missing(self):
+        """Test that load_config creates a config file if it doesn't exist"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_file = Path(temp_dir) / ".lmsp-config"
+            
+            with patch('lmsp.cli.CONFIG_FILE', config_file):
+                config = lmsp.load_config()
+                
+                # Should create file with defaults
+                self.assertTrue(config_file.exists())
+                self.assertEqual(config, lmsp.get_default_config())
+                
+                # Verify file content
+                with open(config_file, 'r') as f:
+                    file_config = json.load(f)
+                    self.assertEqual(file_config, lmsp.get_default_config())
+
+    def test_load_config_with_existing_valid_file(self):
+        """Test loading configuration from existing valid file"""
+        custom_config = {
+            "model": "test-model",
+            "port": 8080,
+            "pipe_mode": "append",
+            "wait": True,
+            "stats": True,
+            "plain": False,
+            "verbose": True
+        }
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_file = Path(temp_dir) / ".lmsp-config"
+            
+            # Create config file with custom values
+            with open(config_file, 'w') as f:
+                json.dump(custom_config, f)
+            
+            with patch('lmsp.cli.CONFIG_FILE', config_file):
+                config = lmsp.load_config()
+                self.assertEqual(config, custom_config)
+
+    def test_load_config_with_invalid_json(self):
+        """Test loading configuration with invalid JSON falls back to defaults"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_file = Path(temp_dir) / ".lmsp-config"
+            
+            # Create config file with invalid JSON
+            with open(config_file, 'w') as f:
+                f.write("{ invalid json }")
+            
+            with patch('lmsp.cli.CONFIG_FILE', config_file):
+                config = lmsp.load_config()
+                self.assertEqual(config, lmsp.get_default_config())
+
+    def test_load_config_validates_values(self):
+        """Test that load_config validates and filters invalid values"""
+        invalid_config = {
+            "model": "test-model",
+            "port": 999,  # Invalid port (too low)
+            "pipe_mode": "invalid",  # Invalid pipe mode
+            "wait": "not_a_boolean",  # Invalid type
+            "unknown_key": "value"  # Unknown key
+        }
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_file = Path(temp_dir) / ".lmsp-config"
+            
+            # Create config file with invalid values
+            with open(config_file, 'w') as f:
+                json.dump(invalid_config, f)
+            
+            with patch('lmsp.cli.CONFIG_FILE', config_file):
+                config = lmsp.load_config()
+                
+                # Should use defaults for invalid values
+                self.assertEqual(config["model"], "test-model")  # Valid model
+                self.assertEqual(config["port"], 1234)  # Default port (invalid port rejected)
+                self.assertEqual(config["pipe_mode"], "replace")  # Default pipe_mode
+                self.assertEqual(config["wait"], False)  # Default wait
+                self.assertNotIn("unknown_key", config)  # Unknown key ignored
+
+    def test_save_config(self):
+        """Test saving configuration to file"""
+        test_config = {
+            "model": "test-model",
+            "port": 8080,
+            "pipe_mode": "append",
+            "wait": True,
+            "stats": False,
+            "plain": True,
+            "verbose": False
+        }
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_file = Path(temp_dir) / ".lmsp-config"
+            
+            with patch('lmsp.cli.CONFIG_FILE', config_file):
+                result = lmsp.save_config(test_config)
+                
+                self.assertTrue(result)  # Save should succeed
+                self.assertTrue(config_file.exists())
+                
+                # Verify file content
+                with open(config_file, 'r') as f:
+                    saved_config = json.load(f)
+                    self.assertEqual(saved_config, test_config)
 
 if __name__ == '__main__':
     unittest.main()
